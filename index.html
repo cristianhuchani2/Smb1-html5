@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>NES WiiU HTML5 Multi</title>
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  background: black;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+canvas {
+  width: 512px;
+  height: 480px;
+  image-rendering: pixelated;
+  border: 2px solid #444;
+}
+</style>
+</head>
+<body>
+
+<canvas id="screen" width="256" height="240"></canvas>
+
+<script src="jsnes.min.js"></script>
+<script>
+const canvas = document.getElementById("screen");
+const ctx = canvas.getContext("2d");
+const imageData = ctx.getImageData(0,0,256,240);
+const buffer = imageData.data;
+
+// Inicializa NES sin sonido
+const nes = new jsnes.NES({
+  onFrame: function(framebuffer) {
+    for (let i = 0; i < framebuffer.length; i++) {
+      const pixel = framebuffer[i];
+      buffer[i*4+0] = (pixel>>16)&255;
+      buffer[i*4+1] = (pixel>>8)&255;
+      buffer[i*4+2] = pixel&255;
+      buffer[i*4+3] = 255;
+    }
+    ctx.putImageData(imageData,0,0);
+  },
+  onAudioSample: function(){}, // Sin sonido
+});
+
+// Carga ROM
+const xhr = new XMLHttpRequest();
+xhr.open("GET","game.nes",true);
+xhr.responseType = "arraybuffer";
+xhr.onload = function(){ nes.loadROM(xhr.response); run(); };
+xhr.send();
+
+// Control de teclado
+const keys = {};
+document.addEventListener("keydown", e => {
+  keys[e.key] = true;
+  e.preventDefault();
+});
+document.addEventListener("keyup", e => {
+  keys[e.key] = false;
+  e.preventDefault();
+});
+
+// Mapeo teclado / multijugador
+function updateKeyboard() {
+  // Jugador 1 - WASD + Z/X
+  nes.button(keys['w'] ? 1 : 0, jsnes.Controller.UP);
+  nes.button(keys['s'] ? 1 : 0, jsnes.Controller.DOWN);
+  nes.button(keys['a'] ? 1 : 0, jsnes.Controller.LEFT);
+  nes.button(keys['d'] ? 1 : 0, jsnes.Controller.RIGHT);
+  nes.button(keys['z'] ? 1 : 0, jsnes.Controller.A);
+  nes.button(keys['x'] ? 1 : 0, jsnes.Controller.B);
+  nes.button(keys['Shift'] ? 1 : 0, jsnes.Controller.SELECT);
+  nes.button(keys['Enter'] ? 1 : 0, jsnes.Controller.START);
+
+  // Jugador 2 - Flechas + N/M
+  nes.button(keys['ArrowUp'] ? 2 : 0, jsnes.Controller.UP);
+  nes.button(keys['ArrowDown'] ? 2 : 0, jsnes.Controller.DOWN);
+  nes.button(keys['ArrowLeft'] ? 2 : 0, jsnes.Controller.LEFT);
+  nes.button(keys['ArrowRight'] ? 2 : 0, jsnes.Controller.RIGHT);
+  nes.button(keys['n'] ? 2 : 0, jsnes.Controller.A);
+  nes.button(keys['m'] ? 2 : 0, jsnes.Controller.B);
+  nes.button(keys['/'] ? 2 : 0, jsnes.Controller.SELECT);
+  nes.button(keys['.'] ? 2 : 0, jsnes.Controller.START);
+}
+
+// GamePad API
+function updateGamepad() {
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  if (!gamepads) return;
+
+  for (let gp of gamepads) {
+    if (!gp) continue;
+    // Mapear botones de GamePad Wii U (puede variar)
+    // Ejemplo: botones 0=A,1=B,2=X,3=Y,8=Select,9=Start
+    nes.button(gp.buttons[12].pressed ? 1 : 0, jsnes.Controller.UP); // UP
+    nes.button(gp.buttons[13].pressed ? 1 : 0, jsnes.Controller.DOWN); // DOWN
+    nes.button(gp.buttons[14].pressed ? 1 : 0, jsnes.Controller.LEFT); // LEFT
+    nes.button(gp.buttons[15].pressed ? 1 : 0, jsnes.Controller.RIGHT); // RIGHT
+    nes.button(gp.buttons[0].pressed ? 1 : 0, jsnes.Controller.A);
+    nes.button(gp.buttons[1].pressed ? 1 : 0, jsnes.Controller.B);
+    nes.button(gp.buttons[8].pressed ? 1 : 0, jsnes.Controller.SELECT);
+    nes.button(gp.buttons[9].pressed ? 1 : 0, jsnes.Controller.START);
+
+    // PREVENIR acciones del navegador
+    window.addEventListener("gamepadconnected", e => e.preventDefault());
+  }
+}
+
+// Loop principal
+function run() {
+  updateKeyboard();
+  updateGamepad();
+  nes.frame();
+  requestAnimationFrame(run);
+}
+</script>
+</body>
+</html>
